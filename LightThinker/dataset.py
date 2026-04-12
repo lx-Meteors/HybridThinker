@@ -849,6 +849,7 @@ class MyDataCollator:
                     exclude_continue=self.exclude_continue,
                     max_length=self.dataset.padding_config['max_length'],
                     prefill_compress=False,
+                    delete_delay_steps=int(self.dataset.config.output_cfg.get("delete_delay_steps", 0)),
                 )
             )
             new_item = padding_item(

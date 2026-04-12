@@ -1342,6 +1342,21 @@ def _sentence_level_generate(
     cot_start = global_start
     cot_end = 0
     van_cot_start = global_start
+    delete_delay_steps = max(0, int(comp_config.output_cfg.get("delete_delay_steps", 0)))
+    pending_delete_ranges: List[Tuple[int, int]] = []
+
+    def _shift_ranges_after_delete(ranges: List[Tuple[int, int]], start: int, end: int) -> List[Tuple[int, int]]:
+        shift = end - start
+        new_ranges: List[Tuple[int, int]] = []
+        for s, e in ranges:
+            if e <= start:
+                new_ranges.append((s, e))
+            elif s >= end:
+                new_ranges.append((s - shift, e - shift))
+            else:
+                continue
+        return new_ranges
+
     assert local_start == kv_utils.get_cache()._seen_tokens, \
         f"{local_start} == {kv_utils.get_cache()._seen_tokens}"
     while predicted_token_id != eos_token_id and new_token_counters < max_new_tokens:
@@ -1486,14 +1501,19 @@ def _sentence_level_generate(
         )
         # 4. update kv cache
         if IS_COMP_MODE:
-            start = local_start
-            end = _local_mask_end
+            pending_delete_ranges.append((local_start, _local_mask_end))
 
-            kv_utils.reduce_cache(start=start, end=end)
-            token_utils.reduce_input_ids(start=start, end=end)
+            # 先把下一段 thought 的起点移动到当前末尾，再按延迟窗口执行实际删除。
+            global_start = len(token_utils._whole_input_ids)
+            local_start = len(token_utils._current_input_ids)
 
-            global_start:int = len(token_utils._whole_input_ids)
-            local_start:int = len(token_utils._current_input_ids)
+            while len(pending_delete_ranges) > delete_delay_steps:
+                start, end = pending_delete_ranges.pop(0)
+                kv_utils.reduce_cache(start=start, end=end)
+                token_utils.reduce_input_ids(start=start, end=end)
+                # 虚拟左移
+                pending_delete_ranges = _shift_ranges_after_delete(pending_delete_ranges, start, end)
+                local_start = len(token_utils._current_input_ids)
 
         # 5. get new predicted_tokens 151665
         predicted_token_id:int = InferenceUtils.get_predicted_token_ids(

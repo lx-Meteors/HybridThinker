@@ -117,6 +117,7 @@ def create_attention_for_aug_data(
     diagonal:bool,
     exclude_continue:bool,
     prefill_compress:bool=True,     
+    delete_delay_steps:int=0,
     max_length:int=None,
 ):
     # 0-False mask
@@ -129,20 +130,30 @@ def create_attention_for_aug_data(
 
     pre_start, pre_end, pre_n_inst, pre_n_comp, pre_n_continue = None, None, None, None, None
     pre_state = None
+    delete_delay_steps = max(0, int(delete_delay_steps))
+    total_output_comp = sum(1 for x in locate_indicator_list if x == 'compressed-output')
+    seen_output_comp = 0
 
     # print(locate_index_list)
     # print(locate_indicator_list)
     for index_item, index_state in zip(locate_index_list, locate_indicator_list):
         assert index_state in ['compressed-prompt', 'compressed-output']
         start, end, l_inst, n_comp, n_continue = index_item
+
+        keep_abandoned_visible = False
+        if index_state == 'compressed-output':
+            seen_output_comp += 1
+            remain_after_cur = total_output_comp - seen_output_comp
+            keep_abandoned_visible = delete_delay_steps > 0 and remain_after_cur < delete_delay_steps
         
         # 1. attention_mask
-        if exclude_continue:# 让后续的 Token（未来）无法看到 原始文本 和 压缩指令（过去）
-            mask[end+l_inst+n_comp:, start:end+l_inst] = 0
-            if pre_n_continue is not None and pre_n_continue != 0:
-                mask[end+l_inst+n_comp:, pre_end+pre_n_inst+pre_n_comp:pre_end+pre_n_inst+pre_n_comp+pre_n_continue] = 0
-        else:
-            mask[end+l_inst+n_comp:, start:end+l_inst] = 0
+        if not keep_abandoned_visible:
+            if exclude_continue:# 让后续的 Token（未来）无法看到 原始文本 和 压缩指令（过去）
+                mask[end+l_inst+n_comp:, start:end+l_inst] = 0
+                if pre_n_continue is not None and pre_n_continue != 0:
+                    mask[end+l_inst+n_comp:, pre_end+pre_n_inst+pre_n_comp:pre_end+pre_n_inst+pre_n_comp+pre_n_continue] = 0
+            else:
+                mask[end+l_inst+n_comp:, start:end+l_inst] = 0
 
         # 1.1 prefill remove compress（默认为true，可以忽略）
         if not prefill_compress and index_state == 'compressed-prompt':
