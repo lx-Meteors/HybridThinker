@@ -190,7 +190,7 @@ class BBHReader(Reader):
 
     def compare_answer(self, model_answer:str, gt_answer:str, idx:int) -> Tuple[bool, str]:
         is_multi_choices:bool = self.is_multiple_choices_question(idx)
-        if model_answer == "error":
+        if model_answer is None or model_answer == "error" or model_answer.strip() == "":
             left_part = model_answer
             right_part = gt_answer
             return False, f"`{left_part}` <=> `{right_part}`"
@@ -334,7 +334,7 @@ class GPQAReader(Reader):
         return ["Return your final response within \\boxed{}."] + self.data_list[idx]['question_list']
 
     def compare_answer(self, model_answer:str, gt_answer:str, idx:int) -> Tuple[bool, str]:
-        if model_answer == "error":
+        if model_answer is None or model_answer == "error" or model_answer.strip() == "":
             left_part = model_answer
             right_part = gt_answer
             return False, f"`{left_part}` <=> `{right_part}`"
@@ -405,7 +405,7 @@ class DISTILLReader(Reader):
         return ["Return your final response within \\boxed{}."] + self.data_list[idx]['question_list']
 
     def compare_answer(self, model_answer:str, gt_answer:str, idx:int) -> Tuple[bool, str]:
-        if model_answer == "error":
+        if model_answer is None or model_answer == "error" or model_answer.strip() == "":
             left_part = model_answer
             right_part = gt_answer
             return False, f"`{left_part}` <=> `{right_part}`"

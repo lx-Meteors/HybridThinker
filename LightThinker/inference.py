@@ -1199,6 +1199,9 @@ def _token_level_generate(
             )
             explicit_token_cnt = 1
             new_length = len(new_input_ids)
+            if token_utils.max_length < token_utils._seen_tokens + new_length:
+                # 超长时直接结束，避免后续 attention 切片维度不匹配
+                break
             if update_attention_method == 'global':
                 origin_length = len(token_utils._whole_input_ids)
                 indicator = [
@@ -1230,6 +1233,8 @@ def _token_level_generate(
                 )
         else:
             explicit_token_cnt += 1
+            if token_utils.max_length < token_utils._seen_tokens + 1:
+                break
             if update_attention_method == 'global':
                 origin_length = len(token_utils._whole_input_ids)
                 attention_mask = attn_utils.update_attention_global(
@@ -1384,6 +1389,9 @@ def _sentence_level_generate(
                 comp_config.continue_token_id
             )
             new_length = len(new_input_ids)
+            if token_utils.max_length < token_utils._seen_tokens + new_length:
+                # 先检查长度，再构造 attention，避免局部切片越界导致 shape mismatch
+                break
             if update_attention_method == 'global':
                 origin_length = len(token_utils._whole_input_ids)
                 indicator = [
@@ -1414,6 +1422,8 @@ def _sentence_level_generate(
                     indicator=indicator
                 )
         else:
+            if token_utils.max_length < token_utils._seen_tokens + 1:
+                break
             if update_attention_method == 'global':
                 origin_length = len(token_utils._whole_input_ids)
                 attention_mask = attn_utils.update_attention_global(
@@ -1432,10 +1442,6 @@ def _sentence_level_generate(
         # primarily for the purpose of reduction.
         _local_mask_end = len(token_utils._current_input_ids) + 1
         # 2. position_ids and input_ids
-        if token_utils.max_length < len(new_input_ids) + token_utils._seen_tokens:
-            # exceed length
-            break
-
         # ......The code is beautifully repeated......
         input_ids, position_ids = token_utils.set_input_ids(new_input_ids, return_tensors=True)
         if IS_COMP_MODE:
