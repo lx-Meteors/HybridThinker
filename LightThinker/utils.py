@@ -119,6 +119,7 @@ def create_attention_for_aug_data(
     prefill_compress:bool=True,     
     delete_delay_steps:int=0,
     max_length:int=None,
+    random_keep_visible_count:int=0,
 ):
     # 0-False mask
     # 1-True don't mask
@@ -138,6 +139,18 @@ def create_attention_for_aug_data(
             _start, _end, _l_inst, _n_comp, _n_continue = index_item
             output_comp_mask_start_list.append(_end + _l_inst + _n_comp)
     seen_output_comp = 0
+    
+    # 预先随机选择要启用“保留窗口(delete_delay_steps)”的窗口索引（按 compressed-output 步计数）
+    # 仅从可形成完整延迟组的起点中采样，避免尾部窗口被选中后一直保留到序列结束。
+    keep_visible_window_indices: set = set()
+    if random_keep_visible_count > 0 and total_output_comp > 0 and delete_delay_steps > 0:
+        # 0-based 起点 i 需要满足 i + delete_delay_steps < total_output_comp
+        valid_window_count = max(0, total_output_comp - delete_delay_steps)
+        if valid_window_count > 0:
+            keep_count = min(int(random_keep_visible_count), valid_window_count)
+            keep_visible_window_indices = set(np.random.choice(valid_window_count, keep_count, replace=False))
+            # 将 np.int64 转成 int
+            keep_visible_window_indices = {int(i) for i in keep_visible_window_indices}
 
     # print(locate_index_list)
     # print(locate_indicator_list)
@@ -149,16 +162,16 @@ def create_attention_for_aug_data(
         mask_start_row = end + l_inst + n_comp
         if index_state == 'compressed-output':
             seen_output_comp += 1
-            if delete_delay_steps <= 0:
-                keep_abandoned_visible = False
-            else:
+            # 随机窗口语义：只有被选中的窗口才启用 delete_delay_steps 的“延迟删除”策略。
+            # 未选中的窗口走立即屏蔽（相当于 delete_delay_steps=0）。
+            use_keep_window = (seen_output_comp - 1) in keep_visible_window_indices
+            if use_keep_window:
                 # Align with inference queue deletion:
                 # segment i is removed when segment (i + delete_delay_steps) is processed.
                 delete_trigger_idx = seen_output_comp + delete_delay_steps
-                if delete_trigger_idx <= total_output_comp:
-                    mask_start_row = output_comp_mask_start_list[delete_trigger_idx - 1]
-                else:
-                    keep_abandoned_visible = True
+                mask_start_row = output_comp_mask_start_list[delete_trigger_idx - 1]
+            else:
+                keep_abandoned_visible = False
         
         # 1. attention_mask
         if not keep_abandoned_visible:

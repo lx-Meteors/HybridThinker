@@ -583,6 +583,7 @@ class MyDataCollator:
                     exclude_continue=self.exclude_continue,
                     max_length=self.dataset.padding_config['max_length'],
                     prefill_compress=self.attention_config['prefill_compress'],
+                    random_keep_visible_count=int(self.dataset.config.output_cfg.get("random_keep_visible_count", 0)),
                 )
             )
             new_item = padding_item(
@@ -653,6 +654,7 @@ class MyDataCollator:
                         exclude_continue=self.exclude_continue,
                         max_length=self.dataset.padding_config['max_length'],
                         prefill_compress=self.attention_config['prefill_compress'],
+                        random_keep_visible_count=int(self.dataset.config.output_cfg.get("random_keep_visible_count", 0)),
                     )
                 )
                 new_item = padding_item(
@@ -780,6 +782,7 @@ class MyDataCollator:
                     exclude_continue=self.exclude_continue,
                     max_length=self.dataset.padding_config['max_length'],
                     prefill_compress=self.attention_config['prefill_compress'],
+                    random_keep_visible_count=int(self.dataset.config.output_cfg.get("random_keep_visible_count", 0)),
                 )
             )
             new_item = padding_item(
@@ -850,6 +853,7 @@ class MyDataCollator:
                     max_length=self.dataset.padding_config['max_length'],
                     prefill_compress=False,
                     delete_delay_steps=int(self.dataset.config.output_cfg.get("delete_delay_steps", 0)),
+                    random_keep_visible_count=int(self.dataset.config.output_cfg.get("random_keep_visible_count", 0)),
                 )
             )
             new_item = padding_item(

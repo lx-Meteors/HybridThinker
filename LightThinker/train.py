@@ -428,7 +428,7 @@ def main():
         output_dir=args.output_dir,
         save_only_model=False,       # don't save the global_steps
         load_best_model_at_end=False,
-        deepspeed=args.deepspeed,
+        # deepspeed=args.deepspeed,
         save_total_limit=1,
         report_to="tensorboard",
         per_device_train_batch_size=args.micro_batch_size,
