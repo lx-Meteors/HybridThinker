@@ -10,7 +10,6 @@ import torch
 
 IGNORE_LABEL_ID = -100
 
-
 def count_mtp_lm_loss_denominators(
     labels: torch.Tensor,
     register_token_index: torch.Tensor,
@@ -45,7 +44,6 @@ def count_mtp_lm_loss_denominators(
     safe_lm_labels = shift_lm_labels[valid_shift_mask]
     lm_count = int((safe_lm_labels != ignore_index).sum().item())
     return mtp_count, lm_count
-
 
 def str2bool(str_bool:str) -> bool:
     str_bool = str_bool[0].upper() + str_bool[1:].lower()
@@ -118,8 +116,13 @@ def create_attention_for_aug_data(
     exclude_continue:bool,
     prefill_compress:bool=True,     
     delete_delay_steps:int=0,
-    max_length:int=None,
+    full_sliding_window:bool=False,
+    random_sliding_window:bool=False,
+    random_skip_sliding_window:bool=False,
+    full_skip_sliding_window:bool=False,
+    full_dropout_sliding_window:bool=False,
     random_keep_visible_count:int=0,
+    max_length:int=None,
 ):
     # 0-False mask
     # 1-True don't mask
@@ -131,56 +134,137 @@ def create_attention_for_aug_data(
 
     pre_start, pre_end, pre_n_inst, pre_n_comp, pre_n_continue = None, None, None, None, None
     pre_state = None
+
+    # 窗口大小
     delete_delay_steps = max(0, int(delete_delay_steps))
+    # 见过的cot step数量
+    seen_output_comp = 0
+    # 总共cot step数量
     total_output_comp = sum(1 for x in locate_indicator_list if x == 'compressed-output')
-    output_comp_mask_start_list: List[int] = []
+    last_mask_row = 0
+
+    output_comp_mask_start_list = []
     for index_item, index_state in zip(locate_index_list, locate_indicator_list):
         if index_state == 'compressed-output':
             _start, _end, _l_inst, _n_comp, _n_continue = index_item
-            output_comp_mask_start_list.append(_end + _l_inst + _n_comp)
-    seen_output_comp = 0
-    
-    # 预先随机选择要启用“保留窗口(delete_delay_steps)”的窗口索引（按 compressed-output 步计数）
-    # 仅从可形成完整延迟组的起点中采样，避免尾部窗口被选中后一直保留到序列结束。
-    keep_visible_window_indices: set = set()
-    if random_keep_visible_count > 0 and total_output_comp > 0 and delete_delay_steps > 0:
-        # 0-based 起点 i 需要满足 i + delete_delay_steps < total_output_comp
-        valid_window_count = max(0, total_output_comp - delete_delay_steps)
-        if valid_window_count > 0:
-            keep_count = min(int(random_keep_visible_count), valid_window_count)
-            keep_visible_window_indices = set(np.random.choice(valid_window_count, keep_count, replace=False))
-            # 将 np.int64 转成 int
-            keep_visible_window_indices = {int(i) for i in keep_visible_window_indices}
+            output_comp_mask_start_list.append((_start, _end, _l_inst, _n_comp, _n_continue))
 
-    # print(locate_index_list)
-    # print(locate_indicator_list)
+
     for index_item, index_state in zip(locate_index_list, locate_indicator_list):
         assert index_state in ['compressed-prompt', 'compressed-output']
         start, end, l_inst, n_comp, n_continue = index_item
+        mask_start_row = end+l_inst+n_comp
 
-        keep_abandoned_visible = False
-        mask_start_row = end + l_inst + n_comp
-        if index_state == 'compressed-output':
+        if full_sliding_window and index_state == 'compressed-output':
+            # delete_delay_steps=2, [r1 c1 r2 c2 r3 c3] 2指的是可看见的r数量，这是一个窗口，下面的列子都是如此：
+            #    r1 c1 r2 c2 r3 c3 r4 c4 r5 c5
+            # r1 1
+            # c1 1  1
+            # r2 1  1  1
+            # c2 1  1  1  1
+            # r3 1  1  1  1  1
+            # c3 1  1  1  1  1  1
+            # r4 0  1  1  1  1  1  1
+            # c4 0  1  1  1  1  1  1  1
+            # r5 0  1  0  1  1  1  1  1  1
+            # c5 0  1  0  1  1  1  1  1  1  1
             seen_output_comp += 1
-            # 随机窗口语义：只有被选中的窗口才启用 delete_delay_steps 的“延迟删除”策略。
-            # 未选中的窗口走立即屏蔽（相当于 delete_delay_steps=0）。
+            delete_trigger_idx = seen_output_comp + delete_delay_steps
+            if delete_trigger_idx <= total_output_comp:
+                _, full_end, full_l_inst, full_n_comp, _ = output_comp_mask_start_list[delete_trigger_idx - 1]
+                mask_start_row = full_end + full_l_inst + full_n_comp
+                mask[mask_start_row:, start:end+l_inst] = 0
+        elif random_sliding_window and index_state == 'compressed-output':
+            #    r1 c1 r2 c2 r3 c3 r4 c4 r5 c5
+            # r1 1
+            # c1 1  1
+            # r2 1  1  1
+            # c2 1  1  1  1
+            # r3 1  1  1  1  1
+            # c3 1  1  1  1  1  1
+            # r4 0  1  0  1  0  1  1
+            # c4 0  1  0  1  0  1  1  1
+            # r5 0  1  0  1  0  1  0  1  1
+            # c5 0  1  0  1  0  1  0  1  1  1
+            keep_visible_window_indices: set = set()
+            valid_window_count = max(0, total_output_comp - delete_delay_steps)
+            keep_visible_window_indices = set(np.random.choice(valid_window_count, random_keep_visible_count, replace=False))
+            keep_visible_window_indices = {int(i) for i in keep_visible_window_indices}
+
+            seen_output_comp += 1
             use_keep_window = (seen_output_comp - 1) in keep_visible_window_indices
             if use_keep_window:
-                # Align with inference queue deletion:
-                # segment i is removed when segment (i + delete_delay_steps) is processed.
                 delete_trigger_idx = seen_output_comp + delete_delay_steps
-                mask_start_row = output_comp_mask_start_list[delete_trigger_idx - 1]
-            else:
-                keep_abandoned_visible = False
+                _, full_end, full_l_inst, full_n_comp, _ = output_comp_mask_start_list[delete_trigger_idx - 1]
+                mask_start_row = full_end + full_l_inst + full_n_comp
+
+            mask_start_row = max(mask_start_row, int(last_mask_row))
+            mask[mask_start_row:, start:end+l_inst] = 0
+            last_mask_row = mask_start_row
+        elif random_skip_sliding_window and index_state == 'compressed-output':
+            #    r1 c1 r2 c2 r3 c3 r4 c4 r5 c5 r6 c6 r7 c7 r8 c8
+            # r1 1
+            # c1 1  1
+            # r2 1  1  1
+            # c2 1  1  1  1
+            # r3 1  1  0  1  1
+            # c3 1  1  0  1  1  1
+            # r4 0  1  0  1  0  1  1
+            # c4 0  1  0  1  0  1  1  1
+            # r5 0  1  0  1  0  1  0  1  1
+            # c5 0  1  0  1  0  1  0  1  1  1
+            keep_visible_window_indices: set = set()
+            valid_window_count = max(0, total_output_comp - delete_delay_steps)
+            keep_visible_window_indices = set(np.random.choice(valid_window_count, random_keep_visible_count, replace=False))
+            keep_visible_window_indices = {int(i) for i in keep_visible_window_indices}
+
+            seen_output_comp += 1
+            use_keep_window = (seen_output_comp - 1) in keep_visible_window_indices
+            if use_keep_window:
+                delete_trigger_idx = seen_output_comp + delete_delay_steps
+                _, full_end, full_l_inst, full_n_comp, _ = output_comp_mask_start_list[delete_trigger_idx - 1]
+                mask_start_row = full_end + full_l_inst + full_n_comp
+
+            mask[mask_start_row:, start:end+l_inst] = 0
+        elif full_skip_sliding_window and index_state == 'compressed-output':
+            #    r1 c1 r2 c2 r3 c3 r4 c4 r5 c5
+            # r1 1
+            # c1 1  1
+            # r2 1  1  1
+            # c2 1  1  1  1
+            # r3 1  1  0  1  1
+            # c3 1  1  0  1  1  1
+            # r4 0  1  1  1  0  1  1
+            # c4 0  1  1  1  0  1  1  1
+            # r5 0  1  0  1  1  1  0  1  1
+            # c5 0  1  0  1  1  1  0  1  1  1
+            # full_skip: 交错跳窗
+            # 规则：
+            # - 在窗口内最后一个可以看见第一个，其他都不可以看见（讨论的是原始内容r）
+            seen_output_comp += 1
+            current_idx = seen_output_comp - 1
+            keep_output_indices = {current_idx}
+
+            first_visible_idx = current_idx - delete_delay_steps
+            if first_visible_idx >= 0:
+                keep_output_indices.add(first_visible_idx)
+
+            for old_idx in range(seen_output_comp - 1):
+                if old_idx in keep_output_indices:
+                    continue
+                old_start, old_end, old_l_inst, old_n_comp, old_n_continue = output_comp_mask_start_list[old_idx]
+                mask[mask_start_row:, old_start:old_end + old_l_inst] = 0
+        elif full_dropout_sliding_window and index_state == 'compressed-output':
+            # 我理解这里应该是训推一致 + 跳步注意力
+            print("Full dropout sliding window enabled.")
+        else:
+            mask[mask_start_row:, start:end+l_inst] = 0
         
         # 1. attention_mask
-        if not keep_abandoned_visible:
-            if exclude_continue:# 让后续的 Token（未来）无法看到 原始文本 和 压缩指令（过去）
-                mask[mask_start_row:, start:end+l_inst] = 0
-                if pre_n_continue is not None and pre_n_continue != 0:
-                    mask[mask_start_row:, pre_end+pre_n_inst+pre_n_comp:pre_end+pre_n_inst+pre_n_comp+pre_n_continue] = 0
-            else:
-                mask[mask_start_row:, start:end+l_inst] = 0
+        if exclude_continue:# 让后续的 Token（未来）无法看到 原始文本 和 压缩指令（过去）
+            mask[end+l_inst+n_comp:, start:end+l_inst] = 0
+            if pre_n_continue is not None and pre_n_continue != 0:
+                mask[end+l_inst+n_comp:, pre_end+pre_n_inst+pre_n_comp:pre_end+pre_n_inst+pre_n_comp+pre_n_continue] = 0
 
         # 1.1 prefill remove compress（默认为true，可以忽略）
         if not prefill_compress and index_state == 'compressed-prompt':
@@ -226,7 +310,6 @@ def create_attention_for_aug_data(
         results = torch.as_tensor(mask)
 
     return results
-
 def create_attention_for_aug_data_apa_mtp(
     input_ids:List[int],
     locate_index_list:List[List[int]],
@@ -305,7 +388,6 @@ def create_attention_for_aug_data_apa_mtp(
         results = torch.as_tensor(mask)
 
     return results, register_token_index 
-
 def create_attention_for_recover_data(
     input_ids:List[int],
     locate_index_list:List[List[int]],

@@ -853,6 +853,11 @@ class MyDataCollator:
                     max_length=self.dataset.padding_config['max_length'],
                     prefill_compress=False,
                     delete_delay_steps=int(self.dataset.config.output_cfg.get("delete_delay_steps", 0)),
+                    full_sliding_window=self.dataset.config.output_cfg.get("full_sliding_window", False),
+                    random_sliding_window=self.dataset.config.output_cfg.get("random_sliding_window", False),
+                    random_skip_sliding_window=self.dataset.config.output_cfg.get("random_skip_sliding_window", False),
+                    full_skip_sliding_window=self.dataset.config.output_cfg.get("full_skip_sliding_window", False),
+                    full_dropout_sliding_window=self.dataset.config.output_cfg.get("full_dropout_sliding_window", False),
                     random_keep_visible_count=int(self.dataset.config.output_cfg.get("random_keep_visible_count", 0)),
                 )
             )
