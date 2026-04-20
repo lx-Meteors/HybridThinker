@@ -139,7 +139,8 @@ def create_attention_for_aug_data(
             _start, _end, _l_inst, _n_comp, _n_continue = index_item
             output_comp_mask_start_list.append(_end + _l_inst + _n_comp)
     seen_output_comp = 0
-    
+    last_mask_row = 0
+
     # 预先随机选择要启用“保留窗口(delete_delay_steps)”的窗口索引（按 compressed-output 步计数）
     # 仅从可形成完整延迟组的起点中采样，避免尾部窗口被选中后一直保留到序列结束。
     keep_visible_window_indices: set = set()
@@ -152,7 +153,7 @@ def create_attention_for_aug_data(
             # 将 np.int64 转成 int
             keep_visible_window_indices = {int(i) for i in keep_visible_window_indices}
 
-    # print(locate_index_list)
+    # print(locate_index_list)    
     # print(locate_indicator_list)
     for index_item, index_state in zip(locate_index_list, locate_indicator_list):
         assert index_state in ['compressed-prompt', 'compressed-output']
@@ -172,7 +173,10 @@ def create_attention_for_aug_data(
                 mask_start_row = output_comp_mask_start_list[delete_trigger_idx - 1]
             else:
                 keep_abandoned_visible = False
-        
+        # Ensure mask_start_row is monotonic non-decreasing to avoid visibility jumps
+        mask_start_row = int(mask_start_row)
+        mask_start_row = max(mask_start_row, int(last_mask_row))
+
         # 1. attention_mask
         if not keep_abandoned_visible:
             if exclude_continue:# 让后续的 Token（未来）无法看到 原始文本 和 压缩指令（过去）
@@ -181,6 +185,9 @@ def create_attention_for_aug_data(
                     mask[mask_start_row:, pre_end+pre_n_inst+pre_n_comp:pre_end+pre_n_inst+pre_n_comp+pre_n_continue] = 0
             else:
                 mask[mask_start_row:, start:end+l_inst] = 0
+
+        # 更新 last_mask_row，保证后续不会回退，避免可见性跳跃
+        last_mask_row = mask_start_row
 
         # 1.1 prefill remove compress（默认为true，可以忽略）
         if not prefill_compress and index_state == 'compressed-prompt':
