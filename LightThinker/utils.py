@@ -243,17 +243,21 @@ def create_attention_for_aug_data(
             # - 在窗口内最后一个可以看见第一个，其他都不可以看见（讨论的是原始内容r）
             seen_output_comp += 1
             current_idx = seen_output_comp - 1
-            keep_output_indices = {current_idx}
+
+            delete_trigger_idx = seen_output_comp + delete_delay_steps
+            if delete_trigger_idx <= total_output_comp:
+                _, full_end, full_l_inst, full_n_comp, _ = output_comp_mask_start_list[delete_trigger_idx - 1]
+                mask_start_row = full_end + full_l_inst + full_n_comp
+                mask[mask_start_row:, start:end+l_inst] = 0
 
             first_visible_idx = current_idx - delete_delay_steps
             if first_visible_idx >= 0:
-                keep_output_indices.add(first_visible_idx)
-
-            for old_idx in range(seen_output_comp - 1):
-                if old_idx in keep_output_indices:
-                    continue
-                old_start, old_end, old_l_inst, old_n_comp, old_n_continue = output_comp_mask_start_list[old_idx]
-                mask[mask_start_row:, old_start:old_end + old_l_inst] = 0
+                for i in range(first_visible_idx + 1, current_idx):
+                    _, next_end, next_l_inst, next_n_comp, _ = output_comp_mask_start_list[i+1]
+                    next_mask_start_row = next_end + next_l_inst + next_n_comp
+                    old_start, old_end, old_l_inst, old_n_comp, old_n_continue = output_comp_mask_start_list[i]
+                    mask_start_row = old_end + old_l_inst + old_n_comp
+                    mask[mask_start_row:next_mask_start_row, old_start:old_end + old_l_inst] = 0
         elif full_dropout_sliding_window and index_state == 'compressed-output':
             # 我理解这里应该是训推一致 + 跳步注意力
             print("Full dropout sliding window enabled.")
