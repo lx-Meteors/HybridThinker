@@ -149,6 +149,13 @@ def create_attention_for_aug_data(
             _start, _end, _l_inst, _n_comp, _n_continue = index_item
             output_comp_mask_start_list.append((_start, _end, _l_inst, _n_comp, _n_continue))
 
+    keep_visible_window_indices: set = set()
+    valid_window_count = max(0, total_output_comp - delete_delay_steps)
+    if valid_window_count > 0:
+        keep_count = min(int(random_keep_visible_count), valid_window_count)
+        keep_visible_window_indices = set(np.random.choice(valid_window_count, keep_count, replace=False))
+        keep_visible_window_indices = {int(i) for i in keep_visible_window_indices}
+
 
     for index_item, index_state in zip(locate_index_list, locate_indicator_list):
         assert index_state in ['compressed-prompt', 'compressed-output']
@@ -186,11 +193,6 @@ def create_attention_for_aug_data(
             # c4 0  1  0  1  0  1  1  1
             # r5 0  1  0  1  0  1  0  1  1
             # c5 0  1  0  1  0  1  0  1  1  1
-            keep_visible_window_indices: set = set()
-            valid_window_count = max(0, total_output_comp - delete_delay_steps)
-            keep_visible_window_indices = set(np.random.choice(valid_window_count, random_keep_visible_count, replace=False))
-            keep_visible_window_indices = {int(i) for i in keep_visible_window_indices}
-
             seen_output_comp += 1
             use_keep_window = (seen_output_comp - 1) in keep_visible_window_indices
             if use_keep_window:
@@ -213,11 +215,6 @@ def create_attention_for_aug_data(
             # c4 0  1  0  1  0  1  1  1
             # r5 0  1  0  1  0  1  0  1  1
             # c5 0  1  0  1  0  1  0  1  1  1
-            keep_visible_window_indices: set = set()
-            valid_window_count = max(0, total_output_comp - delete_delay_steps)
-            keep_visible_window_indices = set(np.random.choice(valid_window_count, random_keep_visible_count, replace=False))
-            keep_visible_window_indices = {int(i) for i in keep_visible_window_indices}
-
             seen_output_comp += 1
             use_keep_window = (seen_output_comp - 1) in keep_visible_window_indices
             if use_keep_window:
@@ -259,8 +256,13 @@ def create_attention_for_aug_data(
                     mask_start_row = old_end + old_l_inst + old_n_comp
                     mask[mask_start_row:next_mask_start_row, old_start:old_end + old_l_inst] = 0
         elif full_dropout_sliding_window and index_state == 'compressed-output':
-            # 我理解这里应该是训推一致 + 跳步注意力
-            print("Full dropout sliding window enabled.")
+            seen_output_comp += 1
+            delete_trigger_idx = seen_output_comp + delete_delay_steps
+            # 80% 概率走 LightThinker 注意力，20% 保持训推一致滑窗注意力
+            if delete_trigger_idx <= total_output_comp and np.random.random() < 0.20:
+                _, full_end, full_l_inst, full_n_comp, _ = output_comp_mask_start_list[delete_trigger_idx - 1]
+                mask_start_row = full_end + full_l_inst + full_n_comp
+            mask[mask_start_row:, start:end+l_inst] = 0
         else:
             mask[mask_start_row:, start:end+l_inst] = 0
         
