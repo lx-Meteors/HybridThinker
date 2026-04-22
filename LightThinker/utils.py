@@ -151,7 +151,7 @@ def create_attention_for_aug_data(
 
     keep_visible_window_indices: set = set()
     valid_window_count = max(0, total_output_comp - delete_delay_steps)
-    if valid_window_count > 0:
+    if valid_window_count > 0 and delete_delay_steps > 0 and random_keep_visible_count > 0:
         keep_count = min(int(random_keep_visible_count), valid_window_count)
         keep_visible_window_indices = set(np.random.choice(valid_window_count, keep_count, replace=False))
         keep_visible_window_indices = {int(i) for i in keep_visible_window_indices}
