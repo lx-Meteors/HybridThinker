@@ -563,31 +563,31 @@ log "执行完成: ${STAGE}"
 
 
 # # 运行示例 train
-# bash /mnt/lxy/RRcot/scripts/pipeline.sh \
+# bash /mnt/RRcot/scripts/pipeline.sh \
 #   --stage train \
 #   --exp_tag vanilla_qwen \
-#   --output_base_dir /mnt/lxy/RRcot/experiments \
+#   --output_base_dir /mnt/RRcot/experiments \
 #   --use_epl false \
 #   --lr 1e-5 \
 #   --mode normal \
 #   --model_type qwen \
-#   --tokenizer_path /mnt/lxy/hf_models/Qwen2.5-1.5B-Instruct \
-#   --train_model_path /mnt/lxy/hf_models/DeepSeek-R1-Distill-Qwen-1.5B \
-#   --train_data_path /mnt/lxy/RRcot/data/train/train_debug.jsonl \
+#   --tokenizer_path /mnt/hf_models/Qwen2.5-1.5B-Instruct \
+#   --train_model_path /mnt/hf_models/DeepSeek-R1-Distill-Qwen-1.5B \
+#   --train_data_path /mnt/RRcot/data/train/train_debug.jsonl \
 #   --train_gpus 0,1,2,3
 
 # # 运行示例 all
-# bash /mnt/zhaorunsong/lx/mem-co-t/scripts/pipeline.sh \
+# bash /mnt/mem-co-t/scripts/pipeline.sh \
 #   --stage train \
 #   --exp_tag epl_mtp_1 \
-#   --output_base_dir /mnt/zhaorunsong/lx/rrcot_test/experiments \
+#   --output_base_dir /mnt/rrcot_test/experiments \
 #   --use_epl true \
 #   --lr 2e-5 \
 #   --mode aug-wo-pc-apa-mtp \
 #   --model_type qwen \
-#   --tokenizer_path /mnt/zhaorunsong/models/qwen2-0.5B-Instruct \
-#   --train_model_path /mnt/zhaorunsong/models/qwen2-0.5B-Instruct \
-#   --train_data_path /mnt/zhaorunsong/lx/mem-co-t/data/train/train_test.jsonl \
+#   --tokenizer_path /mnt/models/qwen2-0.5B-Instruct \
+#   --train_model_path /mnt/models/qwen2-0.5B-Instruct \
+#   --train_data_path /mnt/mem-co-t/data/train/train_test.jsonl \
 #   --train_gpus 0,5,6,7 \
 #   --target_gpus 0,5,6,7 \
 #   --process_per_gpu 1 \
@@ -601,12 +601,12 @@ log "执行完成: ${STAGE}"
 # # 运行示例 infer
 # bash /mnt/lxy/RRcot/scripts/pipeline.sh \
 #   --stage infer \
-#   --infer_model_path /mnt/zhaorunsong/lx/rrcot_test/epl_apa_mtp_w3e-1/train/checkpoint-245 \
-#   --output_base_dir /mnt/lxy/RRcot/experiments/debug_infer_spec_decode \
+#   --infer_model_path /mnt/rrcot_test/epl_apa_mtp_w3e-1/train/checkpoint-245 \
+#   --output_base_dir /mnt/RRcot/experiments/debug_infer_spec_decode \
 #   --use_epl false \
 #   --spec_decode true \
 #   --model_type qwen \
-#   --tokenizer_path /mnt/lxy/hf_models/DeepSeek-R1-Distill-Qwen-1.5B \
+#   --tokenizer_path /mnt/hf_models/DeepSeek-R1-Distill-Qwen-1.5B \
 #   --target_gpus 0 \
 #   --process_per_gpu 1 \
 #   --datasets mmlu
