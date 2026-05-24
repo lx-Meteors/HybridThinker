@@ -36,10 +36,10 @@
 ## 🔧Installation
 
 ```bash
-git clone https://github.com/helldog-star/RRcot
-cd RRcot
-conda create -n lightthinker python=3.9 -y
-conda activate lightthinker
+git clone https://github.com/xxx
+cd HybridThinker
+conda create -n HybridThinker python=3.9 -y
+conda activate HybridThinker
 pip install -r requirements.txt
 cd data && unzip data.zip && cd ..
 ```
@@ -96,14 +96,14 @@ bash scripts/pipeline.sh -h
 bash scripts/pipeline.sh \
   --stage train \
   --exp_tag vanilla_qwen \
-  --output_base_dir /mnt/lxy/RRcot/experiments \
+  --output_base_dir /mnt/HybridThinker/experiments \
   --use_epl false \
   --lr 1e-5 \
   --mode normal \
   --model_type qwen \
-  --tokenizer_path /mnt/lxy/hf_models/Qwen2.5-1.5B-Instruct \
-  --model_path /mnt/lxy/hf_models/DeepSeek-R1-Distill-Qwen-1.5B \
-  --train_data_path /mnt/lxy/RRcot/data/train/train_debug.jsonl \
+  --tokenizer_path /mnt/hf_models/Qwen2.5-1.5B-Instruct \
+  --model_path /mnt/hf_models/DeepSeek-R1-Distill-Qwen-1.5B \
+  --train_data_path /mnt/RRcot/data/train/train_debug.jsonl \
   --train_gpus 0,1,2,3
 ```
 
@@ -113,10 +113,10 @@ bash scripts/pipeline.sh \
 bash scripts/pipeline.sh \
   --stage infer \
   --exp_tag vanilla_qwen \
-  --output_base_dir /mnt/lxy/RRcot/experiments \
+  --output_base_dir /mnt/RRcot/experiments \
   --use_epl false \
   --model_type qwen \
-  --tokenizer_path /mnt/lxy/hf_models/Qwen2.5-1.5B-Instruct \
+  --tokenizer_path /mnt/hf_models/Qwen2.5-1.5B-Instruct \
   --target_gpus 0,1,2,3 \
   --process_per_gpu 1 \
   --datasets mmlu,gsm8k,gpqa,bbh
@@ -128,14 +128,14 @@ bash scripts/pipeline.sh \
 bash scripts/pipeline.sh \
   --stage all \
   --exp_tag vanilla_qwen \
-  --output_base_dir /mnt/lxy/RRcot/experiments \
+  --output_base_dir /mnt/RRcot/experiments \
   --use_epl false \
   --lr 1e-5 \
   --mode normal \
   --model_type qwen \
-  --tokenizer_path /mnt/lxy/hf_models/Qwen2.5-1.5B-Instruct \
-  --model_path /mnt/lxy/hf_models/DeepSeek-R1-Distill-Qwen-1.5B \
-  --train_data_path /mnt/lxy/RRcot/data/train/train_debug.jsonl \
+  --tokenizer_path /mnt/hf_models/Qwen2.5-1.5B-Instruct \
+  --model_path /mnt/hf_models/DeepSeek-R1-Distill-Qwen-1.5B \
+  --train_data_path /mnt/RRcot/data/train/train_debug.jsonl \
   --train_gpus 0,1,2,3 \
   --target_gpus 0,1,2,3 \
   --process_per_gpu 1 \
