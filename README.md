@@ -1,4 +1,4 @@
-
+# 该仓库代码为HybridThinker复现版，其inference.py仅适用于HybridThinker，后续维护引入LightThinker推理代码。
 ```
 /*
  *                                                     __----~~~~~~~~~~~------___
