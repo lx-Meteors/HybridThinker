@@ -17,7 +17,8 @@
     "output": {
         "level": "sentence",
         "step":1 ,
-        "delete_delay_steps": 2,
+        "delete_delay_steps": 4,
+        "random_keep_visible_count": 2,
         "n_token": 300,
         "token_name": "<|o_{t_id}|>",
         "token_desp": "compress output {t_id}",
